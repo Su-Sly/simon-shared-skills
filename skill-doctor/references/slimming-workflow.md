@@ -44,12 +44,39 @@ wc -c SKILL.md
 - 详细的前端组件实现 → references/
 - 完整的 API 端点表格 → references/
 
-## Step 5: 验证
+### Step 5: 验证
 ```bash
 # 主文件应该 < 10KB
 wc -c SKILL.md
 # 所有 references 文件应该被 skill_view 识别
 # skill_view(name='xxx') 的 linked_files 应列出所有 references/
+# ⚠️ .gitignore 陷阱：如果仓库用 /* 忽略一切再逐个取消忽略目录，
+# 新建的 references/ 子目录文件不会被 git 追踪。
+# 用 git add -f 强制添加，或验证 git status --short 是否显示新文件。
 ```
 
-**实战案例**: 某 Skill 从 142KB/2599 行 → 6.2KB/138 行（95.6% 缩减），拆出 4 个 references 文件。
+## Step 6: 跨 Profile 瘦身陷阱
+
+当 Skill 在另一个 profile（如 `work-web`）而非当前活跃 profile（如 `default`）时：
+
+- `skill_manage(action='patch')` → ❌ 报错 "Skill not found in active profile"
+- `skill_manage(action='write_file')` → ❌ 同样报错
+- `write_file` → ❌ 报 "Cross-profile write blocked by soft guard"
+
+**解决方案**：所有 `patch` 和 `write_file` 调用必须加 `cross_profile=True`。
+
+```
+patch(mode='replace', path='~/.hermes/profiles/work-web/.../SKILL.md', 
+      old_string='...', new_string='...', cross_profile=True)
+
+write_file(path='~/.hermes/profiles/work-web/.../references/new.md', 
+           content='...', cross_profile=True)
+```
+
+**批量操作顺序**：
+1. 先创建所有 references 文件（`write_file` × N，全部 `cross_profile=True`）
+2. 再编辑主 SKILL.md（`patch` × N，全部 `cross_profile=True`）
+3. 最后 `wc -l` 验证行数
+
+**实战案例**: maishi-crm 从 142KB/2599 行 → 6.2KB/138 行（95.6% 缩减），拆出 4 个 references 文件共 33KB。
+**实战案例 2**: maishi-vps-apps 从 828 行 → 612 行（26% 缩减），拆出 6 个 references 文件。跨 profile 操作，全程需 cross_profile=True。
