@@ -1,135 +1,101 @@
-1|# Quality Dimensions — Detailed Checklist
-2|
-3|Reference material for skill-doctor. Keep this in references/, not in SKILL.md.
-4|
-5|## Layer 1: Survival
-6|
-7|### 1.1 Trigger Accuracy
-8|
-9|**Check:**
-10|- [ ] Description starts with "Use when..." or explicit trigger condition
-11|- [ ] Includes trigger verbs (send, read, search, create, edit, debug, configure)
-12|- [ ] Includes domain nouns (email, PDF, server, Obsidian, Telegram)
-13|- [ ] Does NOT start with tool names ("Himalaya CLI: ...")
-14|
-15|**Bad patterns (from 107-skill audit, 2026-05-22):**
-16|- `"Tool: feature list"` — e.g., "Himalaya CLI: IMAP/SMTP email from terminal"
-17|- `"Verb feature list"` — e.g., "Create, read, edit .pptx decks"
-18|- `"Methodology name"` — e.g., "4-phase root cause debugging"
-19|
-20|**Good patterns:**
-21|- `"Use when user asks to send, read, search, or manage email"`
-22|- `"Use when user shares a WeChat article link (mp.weixin.qq.com/...)"`
-23|
-24|### 1.2 Executable Procedure
-25|
-26|**Check:**
-27|- [ ] Steps are numbered
-28|- [ ] Each step has a concrete action (command, file edit, API call)
-29|- [ ] No vague language: "be careful", "make sure", "consider", "ensure"
-30|- [ ] Each step produces an observable result
-31|- [ ] Decision points have explicit branching (if X then Y, else Z)
-32|
-33|### 1.3 Input/Output Definition
-34|
-35|**Check:**
-36|- [ ] Required inputs listed (what the skill needs to start)
-37|- [ ] Output format defined (what the skill produces)
-38|- [ ] Edge case: what happens with missing/invalid input
-39|
-40|## Layer 2: Evolution
-41|
-42|### 2.1 Pitfall Coverage
-43|
-44|**Check:**
-45|- [ ] Pitfalls section exists
-46|- [ ] Entries are specific: tool name + wrong behavior + correct behavior
-47|- [ ] Entries are from real past failures, not theoretical
-48|- [ ] At least 1 pitfall for non-trivial skills
-49|
-50|**Bad patterns:**
-51|- No Pitfalls section at all (most common, 11/32 self-built skills)
-52|- "Be careful with edge cases" (useless — which edge cases?)
-53|- "Make sure to validate input" (too generic to change behavior)
-54|
-55|**Good patterns:**
-56|- "AI will try `yaml.dump()` to edit config.yaml — NEVER do this, it corrupts the file. Use targeted sed/patch instead."
-57|- "Don't ask the user to clarify — they hate that. Make a judgment call or give numbered options."
-58|
-59|### 2.2 Progressive Disclosure
-60|
-61|**Check:**
-62|- [ ] SKILL.md < 15,000 characters
-63|- [ ] Reference tables in references/ sub-files
-64|- [ ] Full API docs in references/
-65|- [ ] Long config examples in references/
-66|- [ ] Main file stays at "decision level" — what to do, not every detail
-67|
-68|**Split criteria:**
-69|- Reference tables (filter specs, port mappings, API endpoints) → references/
-70|- Full command examples with all flags → references/
-71|- Decision logic, trigger conditions, step-by-step → keep in SKILL.md
-72|
-73|### 2.3 Staleness Management
-74|
-75|**Check:**
-76|- [ ] All referenced services/tools still exist
-77|- [ ] API endpoints still valid
-78|- [ ] Commands still work on current versions
-79|- [ ] No references to decommissioned infrastructure
-80|
-81|**Action:** If stale content found, either:
-82|1. Update to current state
-83|2. Mark as `[DEPRECATED]` with migration note
-84|3. Remove entirely if no longer relevant
-85|
-86|## Layer 3: Competitiveness
-87|
-88|### 3.1 Script Delegation
-89|
-90|**Check:**
-91|- [ ] Deterministic tasks have scripts in scripts/ sub-directory
-92|- [ ] Skill tells AI to run script, not write commands from scratch
-93|- [ ] Scripts are tested and produce expected output
-94|
-95|**When to create a script:**
-96|- Same command sequence executed in >1 step
-97|- Complex parsing/transformation logic
-98|- Multi-step verification that could be automated
-99|
-100|### 3.2 Memory/Logging
-101|
-102|**Check:**
-103|- [ ] Recurring skills log execution results
-104|- [ ] Logs are read at start of next execution
-105|- [ ] Log format is consistent and parseable
-106|
-107|**Applicable to:** monitoring, maintenance, recurring workflows.
-108|**Not applicable to:** one-shot tasks, research, creative work.
-109|
-110|### 3.3 Observability
-111|
-112|**Check:**
-113|- [ ] Usage can be tracked (how often is this skill loaded?)
-114|- [ ] Success/failure can be determined
-115|- [ ] Quality can be measured over time
-116|
-117|## Overlap Detection Matrix
-118|
-119|For each pair of skills, list top 5 use-case prompts:
-120|
-121|| Use case | Skill A handles? | Skill B handles? |
-122||---|---|---|
-123|| Case 1 | ✅ | ✅ |
-124|| Case 2 | ✅ | ❌ |
-125|| ... | | |
-126|
-127|Overlap = count of ✅/✅ pairs. ≥ 3 = merge candidate.
-128|
-129|**Merge procedure:**
-130|1. Identify unique value in each skill
-131|2. Keep stronger procedure as base
-132|3. Add handoff rules if both have unique scenarios
-133|4. Deduplicate pitfalls
-134|5. Delete absorbed skill
-135|
+# Skill Doctor 12维质量标准
+
+本文件是主文件12维表的详细判据。维度ID与名称是稳定合同：必须恰好为1–12，不新增第13维，也不把“简洁性”改成版本、freshness或可维护性。
+
+## 评分总则
+
+- ✅：合同完整、证据可观察，或明确说明该检查不适用且理由成立。
+- ⚠️：已有意图，但边界、证据或执行细节不完整。
+- ❌：关键合同缺失、存在冲突/安全风险，或失败后仍允许报告完成。
+- 任1个❌或≥3个⚠️进入整改；内容质量verdict与运行影响tier分开。
+- 每个评分必须带路径、行号或原文片段。正则和字符串计数只是线索。
+
+## 固定12维
+
+### 1. 必要性
+
+- 是可复用任务类别，不是一次性会话记录。
+- 没把多个无关职责塞进一个Skill。
+- memory、模板或普通工具已足够时，不额外造Skill。
+
+### 2. 触发正面
+
+- description以“动词 + 任务对象”描述应执行行为。
+- 不靠一串Do not反向塑形。
+- description不从工具名或宽泛领域名开始。
+
+### 3. 触发覆盖面
+
+- 覆盖清晰任务类别，不是“服务器”“写作”等领域词。
+- 路由修改后准备：明确正例、口语正例、相邻负例、冲突例、加载后执行例。
+- 误触发、重命名、description修改或明显重叠时，在新会话/隔离会话做真实调用。
+
+### 4. 负触发
+
+- When Not to Use只排除真实相邻边界。
+- 不用负触发替代正向工作流。
+
+### 5. 冲突规则
+
+- 对重叠Skill写清优先级、输入差异和移交条件。
+- 不让模型按关键词或名称猜。
+
+### 6. 输入要求
+
+- 先通过skill_view、搜索、文件和运行时工具主动取得可检索信息。
+- 只有无法检索且缺失会改变目标时才问用户。
+- 高风险动作前明确影响范围、回滚和授权状态。
+
+### 7. 工作流
+
+- 有4–8个可执行动作或等价的动作性标题/bullet/命令块。
+- 不强制字面编号；检查顺序关系、分支和可执行性。
+- 重复、确定、可验证且人工执行易漂移的机械步骤优先交给canonical脚本。
+- 语义判断、异常解释和方案选择仍由Agent负责。
+
+### 8. 输出格式
+
+- 定义诊断、修改、结构化结果和用户交付格式。
+- 有canonical文件时直接编辑并报告diff/证据；只有用户要求草稿或文件不可访问时才输出全文。
+- 批量结果的schema、计数和verdict公式必须可重算。
+
+### 9. 质量标准与验证闭环
+
+按产物选择：
+
+- `execution_verification`：Action、Target、Method、Success Criteria、Completion Rule五元素齐全。
+- `quality_gate`：定义与风险相称的输出标准/checklist。
+- `not_applicable`：说明为什么没有待验收结果。
+
+长输入、批量、分页、多来源还要分别证明正确性和遍历完整性。评分器用已知PASS/FAIL探针验收，不让被测Agent自证。
+
+### 10. 简洁性
+
+- 主文件保留路由、核心流程、完成门禁；细节按使用场景放references。
+- >300行或>50KB必须评估瘦身；目标通常120–220行、<25KB，超出需有明确理由。
+- 主文件链接>10个references时必须检查按场景合并。
+- description ≤250字符；围栏配对、无空代码块、无损坏格式。
+
+### 11. 硬规则 vs Checklist
+
+用“不可逆性 × 前置条件复杂度 × 失败后果”判断。高风险删除、生产写入、重启、外部通讯、跨Profile治理必须有主动Checklist：
+
+- 明确对象和范围；
+- 数字授权在状态变化之前；
+- 备份/dry-run/diff/回滚；
+- 失败即停；
+- 独立验证。
+
+脚本化和`cross_profile=True`不能扩大授权，也不能绕过安全工具拒绝。
+
+### 12. 日志与可观测性
+
+- 服务、部署、配置、cron、API、进程类Skill：排障第一步查日志，并给真实日志路径/命令。
+- 脚本：时间戳、级别、对象、结果、非零退出码；错误不得静默吞掉。
+- 纯文本或只读语义审计可说明不适用，不强行制造日志。
+
+## Anthropic实践锚点
+
+Anthropic Claude Code团队经验（查证2026-08-08）：https://claude.com/blog/lessons-from-building-claude-code-how-we-use-skills
+
+可复用结论：description服务于路由；Skill采用渐进式披露；gotchas记录真实失败；确定性检查可用脚本/工具增强，但不能代替语义判断。

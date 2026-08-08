@@ -1,82 +1,73 @@
-# 瘦身工作流（Oversized Skill Slimming）
+# Skill瘦身工作流
 
-当 SKILL.md > 300 行或 > 50KB 时，按以下步骤瘦身：
+## 触发与目标
 
-## Step 1: 地图绘制
+出现任一条件就评估瘦身：
+
+- `SKILL.md` >300行或>50KB；
+- 主文件链接>10个references且无法按场景快速选择；
+- 同一门禁、坑点或历史案例重复出现；
+- 旧规则和新规则在活动reference中冲突。
+
+通常目标：主文件120–220行、<25KB。复杂umbrella可超出，但必须说明为什么继续放在主入口，以及拆分会造成什么执行损失。不要为数字机械删知识。
+
+## 1. 建立地图与快照
+
+- 记录完整文件清单、行数、字节、SHA-256和包hash。
+- 完整读取或建立章节/引用清单；工具分页不等于源文件截断。
+- 创建可验证快照，确认文件集合与hash一致后再改。
+
+## 2. 分类内容
+
+主文件保留：
+
+- description、When to Use/Not to Use、冲突规则和输入获取；
+- 权威维度/合同；
+- 4–8步核心工作流；
+- 授权、失败阻断和完成规则；
+- 少量按使用场景组织的reference入口。
+
+移入references：
+
+- 详细判据、长表格、完整代码示例；
+- 批量治理、跨Profile、生产安全等专项流程；
+- 历史案例中已提炼出的可复用经验。
+
+可逆归档：
+
+- 日期/批次命名的原始报告；
+- 已被新权威文档吸收的旧版速查；
+- 与现行合同冲突但仍有追溯价值的材料。
+
+## 3. 合并原则
+
+- 按使用场景合并，不按日期/版本堆文件。
+- 每条知识建立“旧文件/章节 → 新文件/章节或归档路径”映射。
+- 不把多个无关主题合并成新的百科。
+- 真实Markdown链接必须存在；示例链接放在inline/fenced code中。
+
+## 4. 跨Profile边界
+
+`cross_profile=True`不是默认方案。只有用户明确指定目标Profile和修改范围后才可使用：
+
+1. 展示目标文件、动作、快照和回滚。
+2. 获得数字授权。
+3. 写入后完整回读并运行目标Profile验证。
+4. 删除或移动旧副本需要清单内明确授权；未授权时只报告，不删除。
+
+## 5. 验证
+
 ```bash
-# 找到所有 section headers
-grep -n '^#{1,4} ' SKILL.md
-# 查看文件大小
-wc -c SKILL.md
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_audit_skill_package.py
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/audit_skill_package.py . --format json
 ```
 
-## Step 2: 识别提取边界
-按以下优先级提取（从大到小）：
-1. **踩坑记录 / Pitfalls** — 通常是最大块，动辄 500+ 行
-2. **详细代码模式 / Code patterns** — antd 拖拽实现、DnD 代码、表单联动等
-3. **API 端点表 + 数据库 Schema** — 结构化数据，适合独立文件
-4. **第三方集成细节** — Zoho 同步、OAuth 流程、字段映射表
-5. **功能特性详细文档** — 仪表盘实现、PWA 配置、移动端适配
+同时验证：
 
-## Step 3: 创建 references/ 文件
-按**主题**（不是按日期或版本）组织：
-- `references/pitfalls-collection.md` — 所有踩坑，按类别分组
-- `references/api-endpoints.md` — API 表 + DB Schema
-- `references/<module>-guide.md` — 各模块详细指南
+- before/after行数、字节、SKILL hash和包hash；
+- 缩减>30%时有章节映射、迁移目标、引用存在和知识未丢失证据；
+- `skill_view`全文回读和linked files；
+- `hermes skills list --enabled-only`运行时可见；
+- 12维语义复审无新增FAIL/WARN。
 
-每个 references 文件自包含——能独立阅读，不依赖主文件上下文。
-
-## Step 4: 重写 SKILL.md（目标 100-200 行）
-保留：
-- When to Use / Not to Use（触发条件）
-- Architecture 摘要（路径、端口、网络）
-- 核心规则（5-8 条，每条一行）
-- 部署流程（≤10 行命令）
-- 业务模块状态（Phase 列表，每 Phase 1-2 行）
-- **关键代码文件表**（文件路径 + 一句话说明）
-- **References 表**（指向提取出的文件）
-- **Top 5 Pitfalls**（最致命的 5 条，每条一行摘要）
-- Version 信息
-
-移除：
-- 所有 >20 行的代码块 → references/
-- 重复的踩坑记录（同一条坑出现在多处）→ 合并到 references/
-- 详细的前端组件实现 → references/
-- 完整的 API 端点表格 → references/
-
-### Step 5: 验证
-```bash
-# 主文件应该 < 10KB
-wc -c SKILL.md
-# 所有 references 文件应该被 skill_view 识别
-# skill_view(name='xxx') 的 linked_files 应列出所有 references/
-# ⚠️ .gitignore 陷阱：如果仓库用 /* 忽略一切再逐个取消忽略目录，
-# 新建的 references/ 子目录文件不会被 git 追踪。
-# 用 git add -f 强制添加，或验证 git status --short 是否显示新文件。
-```
-
-## Step 6: 跨 Profile 瘦身陷阱
-
-当 Skill 在另一个 profile（如 `work-web`）而非当前活跃 profile（如 `default`）时：
-
-- `skill_manage(action='patch')` → ❌ 报错 "Skill not found in active profile"
-- `skill_manage(action='write_file')` → ❌ 同样报错
-- `write_file` → ❌ 报 "Cross-profile write blocked by soft guard"
-
-**解决方案**：所有 `patch` 和 `write_file` 调用必须加 `cross_profile=True`。
-
-```
-patch(mode='replace', path='~/.hermes/profiles/work-web/.../SKILL.md', 
-      old_string='...', new_string='...', cross_profile=True)
-
-write_file(path='~/.hermes/profiles/work-web/.../references/new.md', 
-           content='...', cross_profile=True)
-```
-
-**批量操作顺序**：
-1. 先创建所有 references 文件（`write_file` × N，全部 `cross_profile=True`）
-2. 再编辑主 SKILL.md（`patch` × N，全部 `cross_profile=True`）
-3. 最后 `wc -l` 验证行数
-
-**实战案例**: maishi-crm 从 142KB/2599 行 → 6.2KB/138 行（95.6% 缩减），拆出 4 个 references 文件共 33KB。
-**实战案例 2**: maishi-vps-apps 从 828 行 → 612 行（26% 缩减），拆出 6 个 references 文件。跨 profile 操作，全程需 cross_profile=True。
+任一失败则修复或从快照回滚，不报告整改完成。
