@@ -47,7 +47,9 @@ Skill包自身结构检查使用`../scripts/audit_skill_package.py`；它只读�
 ## 4. 批量语义审计
 
 - 每个维度证据带路径、行号或片段。
-- 一次审N个Skill时，人读报告只展开⚠️/❌；机器结果仍保留完整12维。
+- 每个逻辑Skill必须生成独立`split_assessment`：使用日志证据的来源/窗口/命中/盲区 + 候选职责五场景逻辑推演 + 四选一结构verdict；该结果归入第1维，不新增第13维。
+- 批量时可一次检索日志后按Skill和调用去重归档，但不能用统一模板给所有Skill复制同一结论；无日志的单元标`usage_evidence.status=none`。
+- 一次审N个Skill时，人读报告只展开⚠️/❌及非`KEEP_SINGLE`的拆分建议；机器结果仍保留完整12维和每单元`split_assessment`。
 - ≥3个Skill同维度⚠️时，标为系统性缺口。
 - 自动化首轮后从FAIL/WARN随机抽3–5个复核；若某维度≥80%失败，优先怀疑启发式过严。
 - 工作流识别动作性标题、祈使bullet、顺序和命令块，不只数编号步骤。
@@ -55,10 +57,24 @@ Skill包自身结构检查使用`../scripts/audit_skill_package.py`；它只读�
 
 ## 5. 委派合同
 
-派发时固定：输入单元、原始12维名称、JSON schema、verdict公式、风险字段和输出路径。主Agent必须独立核验：
+派发时固定：输入单元、原始12维名称、JSON schema、verdict公式、风险字段和输出路径。
+
+### 单单位调用预算
+
+子任务容量必须写进合同，不能只限制命令超时：
+
+- 单 Skill 任务目标不超过38次工具调用；前10次完成冻结、必要读取和before，证据不足记WARN/NOT_TESTED，不无限诊断。
+- 第11–18次完成三方hash备份与精准编辑；第19–30次一次性生成after和7件产物；最迟第34次运行validator，剩余调用只修验收错误。
+- 三个以上独立读取、hash或JSON处理应合并执行，禁止按文件碎片化调用。
+- 预算不足时优先保留未修WARN并完成可验收闭环；只完成诊断、未生成after/产物/validator的worker必须判未完成并从检查点续跑。
+- 每次写入必须检查工具返回的`success`、`verified`或`files_modified`；软守卫拦截、空修改、写入失败都必须判未落盘，不能因调用未抛异常而继续。
+- 跨Profile写入只在用户已明确授权目标Profile与路径时使用`cross_profile=true`；写后回读现场文件并重算hash，临时文件或内存字符串不能作为落盘证据。
+
+主Agent必须独立核验：
 
 - 输入集合与产物集合相等；
 - 每个单元12维恰好齐全且名称正确；
+- 每个单元`split_assessment`字段齐全，日志统计可追溯，逻辑推演不是同义反复；
 - evidence非空，计数与verdict可重算；
 - 产物文件存在、可解析、hash一致；
 - worker没有在文字中承认未完成或保留未计数warning；

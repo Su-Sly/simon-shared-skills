@@ -51,6 +51,7 @@ SECRET_RE = re.compile(
 PLACEHOLDER_RE = re.compile(
     r"(?i)(redacted|placeholder|example|your[_-]|dummy|fake|sample|\*\*\*|<[^>]+>|\$\{)"
 )
+SHELL_ANGLE_PLACEHOLDER_RE = re.compile(r"<[A-Za-z][A-Za-z0-9_.-]*>")
 
 
 @dataclass(frozen=True)
@@ -108,6 +109,39 @@ def iter_fenced_blocks(text: str) -> Iterable[tuple[str, str, int]]:
             continue
         if in_fence:
             lines.append(line)
+
+
+def iter_bare_shell_angle_placeholders(text: str) -> Iterable[re.Match[str]]:
+    """Yield <name>-style placeholders outside shell quotes and comments."""
+    quote: str | None = None
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if quote is not None:
+            if quote == '"' and char == "\\":
+                index += 2
+                continue
+            if char == quote:
+                quote = None
+            index += 1
+            continue
+        if char in {"'", '"'}:
+            quote = char
+            index += 1
+            continue
+        if char == "\\":
+            index += 2
+            continue
+        if char == "#" and (index == 0 or text[index - 1].isspace()):
+            newline = text.find("\n", index)
+            index = len(text) if newline == -1 else newline + 1
+            continue
+        match = SHELL_ANGLE_PLACEHOLDER_RE.match(text, index)
+        if match:
+            yield match
+            index = match.end()
+            continue
+        index += 1
 
 
 def package_hash(root: Path, files: list[Path]) -> str:
@@ -181,6 +215,14 @@ def audit(root: Path, *, verbose: bool = False) -> dict:
             if not block.strip():
                 add("WARN", "markdown.empty_fence", rel, start_line, "Empty code block")
             if lang in {"bash", "sh", "shell"}:
+                for match in iter_bare_shell_angle_placeholders(block):
+                    add(
+                        "FAIL",
+                        "shell.bare_angle_placeholder",
+                        rel,
+                        start_line + line_number(block, match.start()),
+                        "Bare <name>-style placeholder is parsed as shell redirection; assign and quote a variable instead",
+                    )
                 result = subprocess.run(
                     ["bash", "-n"], input=block, text=True, capture_output=True, check=False
                 )
@@ -241,7 +283,7 @@ def audit(root: Path, *, verbose: bool = False) -> dict:
         dimensions[dim_id] = raw_name.strip()
     if duplicate_ids:
         add("FAIL", "dimensions.duplicate", "SKILL.md", 1, f"Duplicate dimension IDs: {sorted(set(duplicate_ids))}")
-    if dimensions != EXPECTED_DIMENSIONS:
+    if dimensions and dimensions != EXPECTED_DIMENSIONS:
         add(
             "FAIL",
             "dimensions.drift",

@@ -83,9 +83,39 @@ class AuditSkillPackageTests(unittest.TestCase):
         result = AUDITOR.audit(self.make_package(main=skill_text(extra="```bash\necho ok")))
         self.assertIn("markdown.unbalanced_fence", self.codes(result))
 
+    def test_shell_variable_placeholder_passes(self) -> None:
+        extra = "```bash\nTARGET_SKILL_NAME='replace-with-skill-name'\nprintf '%s\\n' \"$TARGET_SKILL_NAME\"\n```"
+        result = AUDITOR.audit(self.make_package(main=skill_text(extra=extra)))
+        self.assertNotIn("shell.bare_angle_placeholder", self.codes(result))
+        self.assertEqual(result["status"], "PASS")
+
+    def test_shell_bare_angle_placeholder_fails(self) -> None:
+        extra = "```bash\ncommand --skill-name <name> --allow-missing\n```"
+        result = AUDITOR.audit(self.make_package(main=skill_text(extra=extra)))
+        self.assertIn("shell.bare_angle_placeholder", self.codes(result))
+        self.assertEqual(result["status"], "FAIL")
+
+    def test_quoted_angle_placeholder_is_boundary_safe(self) -> None:
+        extra = "```bash\nprintf '%s\\n' \"prefix <name> suffix\"\n# command --skill-name <ignored>\n```"
+        result = AUDITOR.audit(self.make_package(main=skill_text(extra=extra)))
+        self.assertNotIn("shell.bare_angle_placeholder", self.codes(result))
+
     def test_long_description_fails(self) -> None:
         result = AUDITOR.audit(self.make_package(main=skill_text(description="x" * 251)))
         self.assertIn("frontmatter.description_length", self.codes(result))
+
+    def test_skill_without_dimension_table_does_not_fail_for_drift(self) -> None:
+        main = (
+            "---\n"
+            "name: ordinary-skill\n"
+            'description: "Use when downloading an ebook."\n'
+            "version: 1.0.0\n"
+            "---\n\n"
+            "# Ordinary Skill\n\n"
+            "[Reference](references/guide.md)\n"
+        )
+        result = AUDITOR.audit(self.make_package(main=main))
+        self.assertNotIn("dimensions.drift", self.codes(result))
 
     def test_dimension_drift_fails(self) -> None:
         changed = skill_text().replace("| 12 | **日志与可观测性**", "| 13 | **日志与可观测性**")

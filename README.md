@@ -62,7 +62,7 @@ Agent 会自己 clone 到对应目录，不用你操心路径。
 ## 📝 更新日志
 
 - [查看中文更新日志](CHANGELOG.md)
-- 当前公开版本：`skill-doctor v3.5.0`
+- 当前公开版本：`skill-doctor v3.9.2`
 
 ---
 
